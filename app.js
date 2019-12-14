@@ -1,37 +1,67 @@
 const express = require('express');
-const body = require('body-parser');
+const sharp = require('sharp');
 
-const route = express.Router();
 const app = express();
-const stack = [];
 
-app.use(body.text({ type: '*/*' }));
+app.get(/\/thumbnail\.(jpg|png)/, (req, res) => {
+  const format = req.params[0] == 'png' ? 'png' : 'jpeg';
+  const width = +req.query.width || 300;
+  const height = +req.query.height || 200;
+  const border = +req.query.border || 5;
+  const bgcolor = req.query.bgcolor || '#fcfcfc';
+  const fgcolor = req.query.fgcolor || '#ddd';
+  const textcolor = req.query.textcolor || '#aaa';
+  const textsize = +req.query.textsize || 24;
+  const image = sharp({
+    create: {
+      width,
+      height,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0 },
+    },
+  });
 
-route.post('/', (req, res, next) => {
-  stack.push(req.body);
+  const thumbnail = Buffer.from(
+    `<svg width="${width}" height="${height}">
+    <rect
+        x="0" y="0"
+        width="${width}" height="${height}"
+        fill="${fgcolor}" />
+    <rect
+        x="${border}" y="${border}"
+        width="${width - border * 2}" height="${height
+      - border * 2}"
+        fill="${bgcolor}" />
+    <line
+        x1="${border * 2}" y1="${border * 2}"
+        x2="${width - border * 2}" y2="${height
+      - border * 2}"
+        stroke-width="${border}" stroke="${fgcolor}" />
+    <line
+        x1="${width - border * 2}" y1="${border * 2}"
+        x2="${border * 2}" y2="${height - border * 2}"
+        stroke-width="${border}" stroke="${fgcolor}" />
+    <rect
+        x="${border}" y="${(height - textsize) / 2}"
+        width="${width - border * 2}" height="${textsize}"
+        fill="${bgcolor}" />
+    <text
+        x="${width / 2}" y="${height / 2}" dy="8"
+        font-family="Helvetica" font-size="${textsize}"
+        fill="${textcolor}" text-anchor="middle">${width} x ${height}</text>
+</svg>`,
+  );
 
-  return next();
+  image
+    .composite([
+      {
+        input: thumbnail,
+      },
+    ])
+    [format]()
+    .pipe(res);
 });
 
-route.delete('/', (req, res, next) => {
-  stack.pop();
-
-  return next();
+app.listen(3000, () => {
+  console.log('ready');
 });
-
-route.get('/:index', (req, res) => {
-  if (
-    req.params.index >= 0
-    && req.params.index < stack.length
-  ) {
-    return res.end(`${stack[req.params.index]}`);
-  }
-  res.status(404).end();
-});
-
-route.use((req, res) => {
-  res.send(stack);
-});
-
-app.use('/stack', route);
-app.listen(3000);
