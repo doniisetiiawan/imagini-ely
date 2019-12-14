@@ -1,7 +1,41 @@
+const bodyparser = require('body-parser');
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const sharp = require('sharp');
 
 const app = express();
+
+app.post(
+  '/uploads/:image',
+  bodyparser.raw({
+    limit: '10mb',
+    type: 'image/*',
+  }),
+  (req, res) => {
+    const image = req.params.image.toLowerCase();
+
+    if (!image.match(/\.(png|jpg)$/)) {
+      return res.status(403).end();
+    }
+
+    const len = req.body.length;
+    const fd = fs.createWriteStream(
+      path.join(__dirname, 'uploads', image),
+      {
+        flags: 'w+',
+        encoding: 'binary',
+      },
+    );
+
+    fd.write(req.body);
+    fd.end();
+
+    fd.on('close', () => {
+      res.send({ status: 'ok', size: len });
+    });
+  },
+);
 
 app.get(/\/thumbnail\.(jpg|png)/, (req, res) => {
   const format = req.params[0] == 'png' ? 'png' : 'jpeg';
