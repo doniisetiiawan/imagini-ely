@@ -1,26 +1,25 @@
 const express = require('express');
+const body = require('body-parser');
 
+const route = express.Router();
 const app = express();
 const stack = [];
 
-app.post('/stack', (req, res, next) => {
-  let buffer = '';
+app.use(body.text({ type: '*/*' }));
 
-  req.on('data', (data) => {
-    buffer += data;
-  });
-  req.on('end', () => {
-    stack.push(buffer);
-    return next();
-  });
-});
+route.post('/', (req, res, next) => {
+  stack.push(req.body);
 
-app.delete('/stack', (req, res, next) => {
-  stack.pop();
   return next();
 });
 
-app.get('/stack/:index', (req, res) => {
+route.delete('/', (req, res, next) => {
+  stack.pop();
+
+  return next();
+});
+
+route.get('/:index', (req, res) => {
   if (
     req.params.index >= 0
     && req.params.index < stack.length
@@ -30,8 +29,9 @@ app.get('/stack/:index', (req, res) => {
   res.status(404).end();
 });
 
-app.use('/stack', (req, res) => {
+route.use((req, res) => {
   res.send(stack);
 });
 
+app.use('/stack', route);
 app.listen(3000);
