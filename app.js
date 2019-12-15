@@ -6,6 +6,23 @@ const sharp = require('sharp');
 
 const app = express();
 
+app.param('image', (req, res, next, image) => {
+  if (!image.match(/\.(png|jpg)$/i)) {
+    return res
+      .status(req.method == 'POST' ? 403 : 404)
+      .end();
+  }
+
+  req.image = image;
+  req.localpath = path.join(
+    __dirname,
+    'uploads',
+    req.image,
+  );
+
+  return next();
+});
+
 app.post(
   '/uploads/:image',
   bodyparser.raw({
@@ -13,71 +30,36 @@ app.post(
     type: 'image/*',
   }),
   (req, res) => {
-    const image = req.params.image.toLowerCase();
+    const fd = fs.createWriteStream(req.localpath, {
+      flags: 'w+',
+      encoding: 'binary',
+    });
 
-    if (!image.match(/\.(png|jpg)$/)) {
-      return res.status(403).end();
-    }
-
-    const len = req.body.length;
-    const fd = fs.createWriteStream(
-      path.join(__dirname, 'uploads', image),
-      {
-        flags: 'w+',
-        encoding: 'binary',
-      },
-    );
-
-    fd.write(req.body);
-    fd.end();
+    fd.end(req.body);
 
     fd.on('close', () => {
-      res.send({ status: 'ok', size: len });
+      res.send({ status: 'ok', size: req.body.length });
     });
   },
 );
 
 app.head('/uploads/:image', (req, res) => {
-  fs.access(
-    path.join(__dirname, 'uploads', req.params.image),
-    fs.constants.R_OK,
-    (err) => {
-      res.status(err ? 404 : 200);
-      res.end();
-    },
-  );
+  fs.access(req.localpath, fs.constants.R_OK, (err) => {
+    res.status(err ? 404 : 200).end();
+  });
 });
 
 app.get('/uploads/:image', (req, res) => {
-  const ext = path.extname(req.params.image);
-
-  if (!ext.match(/^\.(png|jpg)$/)) {
-    return res.status(404).end();
-  }
-
-  const fd = fs.createReadStream(
-    path.join(__dirname, 'uploads', req.params.image),
-  );
+  const fd = fs.createReadStream(req.localpath);
 
   fd.on('error', (e) => {
-    if (e.code == 'ENOENT') {
-      res.status(404);
-
-      if (req.accepts('html')) {
-        res.setHeader('Content-Type', 'text/html');
-
-        res.write(
-          '<strong>Error:</strong> image not found',
-        );
-      }
-
-      return res.end();
-    }
-
-    res.status(500).end();
+    res.status(e.code == 'ENOENT' ? 404 : 500).end();
   });
 
-  res.setHeader('Content-Type', `image/${ext.substr(1)}`);
+  res.setHeader(
+    'Content-Type',
+    `image/${path.extname(req.image).substr(1)}`,
+  );
 
   fd.pipe(res);
 });
