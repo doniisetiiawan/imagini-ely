@@ -23,6 +23,18 @@ app.param('image', (req, res, next, image) => {
   return next();
 });
 
+app.param('width', (req, res, next, width) => {
+  req.width = +width;
+
+  return next();
+});
+
+app.param('height', (req, res, next, height) => {
+  req.height = +height;
+
+  return next();
+});
+
 app.post(
   '/uploads/:image',
   bodyparser.raw({
@@ -49,20 +61,36 @@ app.head('/uploads/:image', (req, res) => {
   });
 });
 
-app.get('/uploads/:image', (req, res) => {
-  const fd = fs.createReadStream(req.localpath);
+function downloadImage(req, res) {
+  fs.access(req.localpath, fs.constants.R_OK, (err) => {
+    if (err) return res.status(404).end();
 
-  fd.on('error', (e) => {
-    res.status(e.code == 'ENOENT' ? 404 : 500).end();
+    const image = sharp(req.localpath);
+
+    if (req.width && req.height) {
+      image.resize({ fit: 'fill' });
+    }
+
+    if (req.width || req.height) {
+      image.resize(req.width, req.height);
+    }
+
+    res.setHeader(
+      'Content-Type',
+      `image/${path.extname(req.image).substr(1)}`,
+    );
+
+    image.pipe(res);
   });
+}
 
-  res.setHeader(
-    'Content-Type',
-    `image/${path.extname(req.image).substr(1)}`,
-  );
-
-  fd.pipe(res);
-});
+app.get(
+  '/uploads/:width(\\d+)x:height(\\d+)-:image',
+  downloadImage,
+);
+app.get('/uploads/_x:height(\\d+)-:image', downloadImage);
+app.get('/uploads/:width(\\d+)x_-:image', downloadImage);
+app.get("/uploads/:image", downloadImage);
 
 app.get(/\/thumbnail\.(jpg|png)/, (req, res) => {
   const format = req.params[0] == 'png' ? 'png' : 'jpeg';
