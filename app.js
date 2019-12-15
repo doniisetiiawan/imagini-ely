@@ -23,6 +23,14 @@ app.param('image', (req, res, next, image) => {
   return next();
 });
 
+app.param('greyscale', (req, res, next, greyscale) => {
+  if (greyscale != 'bw') return next('route');
+
+  req.greyscale = true;
+
+  return next();
+});
+
 app.param('width', (req, res, next, width) => {
   req.width = +width;
 
@@ -75,6 +83,10 @@ function downloadImage(req, res) {
       image.resize(req.width, req.height);
     }
 
+    if (req.greyscale) {
+      image.greyscale();
+    }
+
     res.setHeader(
       'Content-Type',
       `image/${path.extname(req.image).substr(1)}`,
@@ -85,12 +97,25 @@ function downloadImage(req, res) {
 }
 
 app.get(
+  '/uploads/:width(\\d+)x:height(\\d+)-:greyscale-:image',
+  downloadImage,
+);
+app.get(
   '/uploads/:width(\\d+)x:height(\\d+)-:image',
   downloadImage,
 );
+app.get(
+  '/uploads/_x:height(\\d+)-:greyscale-:image',
+  downloadImage,
+);
 app.get('/uploads/_x:height(\\d+)-:image', downloadImage);
+app.get(
+  '/uploads/:width(\\d+)x_-:greyscale-:image',
+  downloadImage,
+);
 app.get('/uploads/:width(\\d+)x_-:image', downloadImage);
-app.get("/uploads/:image", downloadImage);
+app.get('/uploads/:greyscale-:image', downloadImage);
+app.get('/uploads/:image', downloadImage);
 
 app.get(/\/thumbnail\.(jpg|png)/, (req, res) => {
   const format = req.params[0] == 'png' ? 'png' : 'jpeg';
