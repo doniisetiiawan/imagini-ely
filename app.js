@@ -74,16 +74,19 @@ function downloadImage(req, res) {
     if (err) return res.status(404).end();
 
     const image = sharp(req.localpath);
+    const width = +req.query.width;
+    const height = +req.query.height;
+    const greyscale = req.query.greyscale == 'y';
 
-    if (req.width && req.height) {
+    if (width > 0 && height > 0) {
       image.resize({ fit: 'fill' });
     }
 
-    if (req.width || req.height) {
-      image.resize(req.width, req.height);
+    if (width > 0 || height > 0) {
+      image.resize(width || null, height || null);
     }
 
-    if (req.greyscale) {
+    if (greyscale) {
       image.greyscale();
     }
 
@@ -96,25 +99,6 @@ function downloadImage(req, res) {
   });
 }
 
-app.get(
-  '/uploads/:width(\\d+)x:height(\\d+)-:greyscale-:image',
-  downloadImage,
-);
-app.get(
-  '/uploads/:width(\\d+)x:height(\\d+)-:image',
-  downloadImage,
-);
-app.get(
-  '/uploads/_x:height(\\d+)-:greyscale-:image',
-  downloadImage,
-);
-app.get('/uploads/_x:height(\\d+)-:image', downloadImage);
-app.get(
-  '/uploads/:width(\\d+)x_-:greyscale-:image',
-  downloadImage,
-);
-app.get('/uploads/:width(\\d+)x_-:image', downloadImage);
-app.get('/uploads/:greyscale-:image', downloadImage);
 app.get('/uploads/:image', downloadImage);
 
 app.get(/\/thumbnail\.(jpg|png)/, (req, res) => {
