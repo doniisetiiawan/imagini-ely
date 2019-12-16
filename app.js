@@ -32,8 +32,8 @@ db.connect((err) => {
   setInterval(() => {
     db.query(
       'DELETE FROM images '
-      + 'WHERE (date_created < UTC_TIMETSTAMP - INTERVAL 1 WEEK AND date_used IS NULL) '
-      + ' OR (date_used < UTC_TIMETSTAMP - INTERVAL 1 MONTH)',
+        + 'WHERE (date_created < UTC_TIMETSTAMP - INTERVAL 1 WEEK AND date_used IS NULL) '
+        + ' OR (date_used < UTC_TIMETSTAMP - INTERVAL 1 MONTH)',
     );
   }, 3600 * 1000);
 
@@ -116,6 +116,22 @@ db.connect((err) => {
   });
 
   function downloadImage(req, res) {
+    if (Object.keys(req.query).length === 0) {
+      db.query(
+        'UPDATE images '
+          + 'SET date_used = UTC_TIMESTAMP '
+          + 'WHERE id = ?',
+        [req.image.id],
+      );
+
+      res.setHeader(
+        'Content-Type',
+        `image/${path.extname(req.image.name).substr(1)}`,
+      );
+
+      return res.end(req.image.data);
+    }
+
     const image = sharp(req.image.data);
     const width = +req.query.width;
     const height = +req.query.height;
@@ -151,8 +167,8 @@ db.connect((err) => {
 
     db.query(
       'UPDATE images '
-      + 'SET date_used = UTC_TIMESTAMP '
-      + 'WHERE id = ?',
+        + 'SET date_used = UTC_TIMESTAMP '
+        + 'WHERE id = ?',
       [req.image.id],
     );
 
@@ -169,9 +185,9 @@ db.connect((err) => {
   app.get('/stats', (req, res) => {
     db.query(
       'SELECT COUNT(*) total'
-      + ', SUM(size) size '
-      + ', MAX(date_created) last_created '
-      + 'FROM images',
+        + ', SUM(size) size '
+        + ', MAX(date_created) last_used '
+        + 'FROM images',
       (err, rows) => {
         if (err) {
           return res.status(500).end();
@@ -211,12 +227,12 @@ db.connect((err) => {
     <rect
         x="${border}" y="${border}"
         width="${width - border * 2}" height="${height
-      - border * 2}"
+        - border * 2}"
         fill="${bgcolor}" />
     <line
         x1="${border * 2}" y1="${border * 2}"
         x2="${width - border * 2}" y2="${height
-      - border * 2}"
+        - border * 2}"
         stroke-width="${border}" stroke="${fgcolor}" />
     <line
         x1="${width - border * 2}" y1="${border * 2}"

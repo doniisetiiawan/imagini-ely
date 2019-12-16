@@ -5,32 +5,29 @@ const tools = require('../tools');
 
 chai.use(http);
 
-describe('Uploading image', () => {
+describe('Checking image', () => {
   beforeEach((done) => {
     chai
       .request(tools.service)
-      .delete('/uploads/test_image_upload.png')
+      .delete('/uploads/test_image_check.png')
       .end(() => done());
   });
 
-  it('should accept a PNG image', (done) => {
+  it("should return 404 if it doesn't exist", (done) => {
     chai
       .request(tools.service)
-      .post('/uploads/test_image_upload.png')
-      .set('Content-Type', 'image/png')
-      .send(tools.sample)
+      .head('/uploads/test_image_check.png')
       .end((err, res) => {
-        chai.expect(res).to.have.status(200);
-        chai.expect(res.body).to.have.status('ok');
+        chai.expect(res).to.have.status(404);
 
         return done();
       });
   });
 
-  it('should deny duplicated images', (done) => {
+  it('should return 200 if it exists', (done) => {
     chai
       .request(tools.service)
-      .post('/uploads/test_image_upload.png')
+      .post('/uploads/test_image_check.png')
       .set('Content-Type', 'image/png')
       .send(tools.sample)
       .end((err, res) => {
@@ -39,15 +36,9 @@ describe('Uploading image', () => {
 
         chai
           .request(tools.service)
-          .post('/uploads/test_image_upload.png')
-          .set('Content-Type', 'image/png')
-          .send(tools.sample)
+          .head('/uploads/test_image_check.png')
           .end((err, res) => {
             chai.expect(res).to.have.status(200);
-            chai.expect(res.body).to.have.status('error');
-            chai
-              .expect(res.body)
-              .to.have.property('code', 'ER_DUP_ENTRY');
 
             return done();
           });
