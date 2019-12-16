@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 const chai = require('chai');
 const http = require('chai-http');
+const sinon = require('sinon');
 const tools = require('../tools');
 
 chai.use(http);
@@ -16,6 +17,29 @@ describe('Statistics', () => {
         chai.expect(res.body).to.have.property('size');
         chai.expect(res.body).to.have.property('last_used');
         chai.expect(res.body).to.have.property('uptime');
+
+        return done();
+      });
+  });
+
+  it('should return 500 if a database error happens', (done) => {
+    const query = sinon.stub(tools.service.db, 'query');
+
+    query
+      .withArgs(
+        'SELECT COUNT(*) total, SUM(size) size, MAX(date_used) last_used FROM images',
+      )
+      .callsArgWithAsync(1, new Error('Fake'));
+
+    query.callThrough();
+
+    chai
+      .request(tools.service)
+      .get('/stats')
+      .end((err, res) => {
+        chai.expect(res).to.have.status(500);
+
+        query.restore();
 
         return done();
       });

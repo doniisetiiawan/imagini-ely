@@ -8,6 +8,8 @@ const settings = require('./settings');
 const app = express();
 const db = mysql.createConnection(settings.db);
 
+app.db = db;
+
 db.connect((err) => {
   if (err) throw err;
 
@@ -32,8 +34,8 @@ db.connect((err) => {
   setInterval(() => {
     db.query(
       'DELETE FROM images '
-        + 'WHERE (date_created < UTC_TIMETSTAMP - INTERVAL 1 WEEK AND date_used IS NULL) '
-        + ' OR (date_used < UTC_TIMETSTAMP - INTERVAL 1 MONTH)',
+        + 'WHERE (date_created < UTC_TIMESTAMP - INTERVAL 1 WEEK AND date_used IS NULL) '
+        + '   OR (date_used < UTC_TIMESTAMP - INTERVAL 1 MONTH)',
     );
   }, 3600 * 1000);
 
@@ -185,8 +187,8 @@ db.connect((err) => {
   app.get('/stats', (req, res) => {
     db.query(
       'SELECT COUNT(*) total'
-        + ', SUM(size) size '
-        + ', MAX(date_created) last_used '
+        + ', SUM(size) size'
+        + ', MAX(date_used) last_used '
         + 'FROM images',
       (err, rows) => {
         if (err) {
