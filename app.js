@@ -2,27 +2,59 @@ const bodyparser = require('body-parser');
 const path = require('path');
 const express = require('express');
 const sharp = require('sharp');
-const redis = require('redis');
+const mysql = require('mysql');
+const settings = require('./settings');
 
 const app = express();
-const db = redis.createClient();
+const db = mysql.createConnection(settings.db);
 
-db.on('connect', () => {
+db.connect((err) => {
+  if (err) throw err;
+
   console.log('db: ready');
 
-  app.param('image', (req, res, next, name) => {
-    if (!name.match(/\.(png|jpg)$/i)) {
+  db.query(
+    `CREATE TABLE IF NOT EXISTS images
+    (
+        id INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+        date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        date_used TIMESTAMP NULL DEFAULT NULL,
+        name VARCHAR(126) NOT NULL,
+        size INT(11) UNSIGNED NOT NULL,
+        data LONGBLOB NOT NULL,
+
+        PRIMARY KEY (id),
+        UNIQUE KEY name (name)
+    )
+    ENGINE=InnoDB DEFAULT CHARSET=utf8`,
+  );
+
+  setInterval(() => {
+    db.query(
+      'DELETE FROM images '
+      + 'WHERE (date_created < UTC_TIMETSTAMP - INTERVAL 1 WEEK AND date_used IS NULL) '
+      + ' OR (date_used < UTC_TIMETSTAMP - INTERVAL 1 MONTH)',
+    );
+  }, 3600 * 1000);
+
+  app.param('image', (req, res, next, image) => {
+    if (!image.match(/\.(png|jpg)$/i)) {
       return res.status(403).end();
     }
 
-    db.hgetall(name, (err, image) => {
-      if (err || !image) return res.status(404).end();
+    db.query(
+      'SELECT * FROM images WHERE name = ?',
+      [image],
+      (err, images) => {
+        if (err || !images.length) {
+          return res.status(404).end();
+        }
 
-      req.image = image;
-      req.image.name = name;
+        req.image = images[0];
 
-      return next();
-    });
+        return next();
+      },
+    );
   });
 
   app.param('greyscale', (req, res, next, greyscale) => {
@@ -52,11 +84,12 @@ db.on('connect', () => {
       type: 'image/*',
     }),
     (req, res) => {
-      db.hmset(
-        req.params.name,
+      db.query(
+        'INSERT INTO images SET ?',
         {
+          name: req.params.name,
           size: req.body.length,
-          data: req.body.toString('base64'),
+          data: req.body,
         },
         (err) => {
           if (err) {
@@ -75,13 +108,15 @@ db.on('connect', () => {
   app.head('/uploads/:image', (req, res) => res.status(200).end());
 
   app.delete('/uploads/:image', (req, res) => {
-    db.del(req.image.name, (err) => res.status(err ? 500 : 200).end());
+    db.query(
+      'DELETE FROM images WHERE id = ?',
+      [req.image.id],
+      (err) => res.status(err ? 500 : 200).end(),
+    );
   });
 
   function downloadImage(req, res) {
-    const image = sharp(
-      Buffer.from(req.image.data, 'base64'),
-    );
+    const image = sharp(req.image.data);
     const width = +req.query.width;
     const height = +req.query.height;
     const blur = +req.query.blur;
@@ -114,7 +149,12 @@ db.on('connect', () => {
     if (sharpen > 0) image.sharpen(sharpen);
     if (greyscale) image.greyscale();
 
-    db.hset(req.image.name, 'date_used', Date.now());
+    db.query(
+      'UPDATE images '
+      + 'SET date_used = UTC_TIMESTAMP '
+      + 'WHERE id = ?',
+      [req.image.id],
+    );
 
     res.setHeader(
       'Content-Type',
@@ -125,6 +165,24 @@ db.on('connect', () => {
   }
 
   app.get('/uploads/:image', downloadImage);
+
+  app.get('/stats', (req, res) => {
+    db.query(
+      'SELECT COUNT(*) total'
+      + ', SUM(size) size '
+      + ', MAX(date_created) last_created '
+      + 'FROM images',
+      (err, rows) => {
+        if (err) {
+          return res.status(500).end();
+        }
+
+        rows[0].uptime = process.uptime();
+
+        return res.send(rows[0]);
+      },
+    );
+  });
 
   app.get(/\/thumbnail\.(jpg|png)/, (req, res) => {
     const format = req.params[0] == 'png' ? 'png' : 'jpeg';
@@ -153,12 +211,12 @@ db.on('connect', () => {
     <rect
         x="${border}" y="${border}"
         width="${width - border * 2}" height="${height
-        - border * 2}"
+      - border * 2}"
         fill="${bgcolor}" />
     <line
         x1="${border * 2}" y1="${border * 2}"
         x2="${width - border * 2}" y2="${height
-        - border * 2}"
+      - border * 2}"
         stroke-width="${border}" stroke="${fgcolor}" />
     <line
         x1="${width - border * 2}" y1="${border * 2}"
