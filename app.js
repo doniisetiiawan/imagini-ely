@@ -247,3 +247,5 @@ db.connect((err) => {
     console.log('app: ready');
   });
 });
+
+module.exports = app;
