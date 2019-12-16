@@ -28,5 +28,5 @@ coverage
 benchmarks/graphs
 
 .idea/
-
 uploads/
+.nyc_output/
