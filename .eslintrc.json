@@ -16,6 +16,9 @@
   "rules": {
     "consistent-return": "off",
     "eqeqeq": "off",
-    "no-unexpected-multiline": "off"
+    "no-unexpected-multiline": "off",
+    "no-shadow": "warn",
+    "prefer-destructuring": "off",
+    "no-param-reassign": "off"
   }
 }
