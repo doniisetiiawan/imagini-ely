@@ -19,6 +19,7 @@
     "no-unexpected-multiline": "off",
     "no-shadow": "warn",
     "prefer-destructuring": "off",
-    "no-param-reassign": "off"
+    "no-param-reassign": "off",
+    "array-callback-return": "warn"
   }
 }
