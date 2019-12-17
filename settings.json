@@ -1,3 +1,3 @@
 {
-  "db": "mysql://root@localhost/imagini"
+  "db": "mysql://root@host.docker.internal/imagini"
 }
