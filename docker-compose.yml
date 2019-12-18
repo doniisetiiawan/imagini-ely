@@ -7,10 +7,16 @@ services:
     networks:
       - imagini
     volumes:
-      - ${PWD}/mysql:/var/lib/mysql
+      - /var/lib/mysql:/var/lib/mysql
+    ports:
+      - "3306:3306"
     environment:
       MYSQL_DATABASE: imagini
       MYSQL_ROOT_PASSWORD: secret
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
   service:
     image: imagini:0.0.5
     networks:
